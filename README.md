@@ -26,5 +26,5 @@ Robots Connect SDK allows users to quickly build a remote teleoperation system f
 | LeKiwi       | EarthRover Mini+ |
 |--------------|------------------|
 | <img src="https://github.com/SIGRobotics-UIUC/LeKiwi/raw/main/media/lekiwi_real.jpg" width="200"/>  | <img src="https://shop.frodobots.com/cdn/shop/files/6s.jpg?v=1748002022" width="200"/> |
-| Coming soon  | Coming soon    |
+| [Getting Started](https://github.com/frodobots-org/robots-connect/blob/main/robots/lekiwi.md)  | Coming soon    |
 

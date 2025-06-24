@@ -50,12 +50,13 @@ Install necessary libraries:
 ```
 apt install -y
 apt install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-gstreamer1.0-plugins-ugly libzmq3-dev
+gstreamer1.0-plugins-ugly libzmq3-dev \
+libcurl4-openssl-dev libssl-dev
 ```
 
 #### Download Teleop Agent
 
-Download `teleop_agent.run` to your Pi (provide link if available).
+Download [teleop-agent.run](https://github.com/frodobots-org/robots-connect/) to your Pi.
 
 #### Configure Teleop Agent
 
@@ -70,7 +71,7 @@ Download `teleop_agent.run` to your Pi (provide link if available).
 Start the agent using the config file:
 
 ```
-./teleop_agent.run -c lekiwi.teleop.ini
+./teleop-agent.run -- <absolute path>/lekiwi.teleop.ini
 ```
 
 ---
@@ -90,3 +91,6 @@ Start the agent using the config file:
     👉 [Calibration Video](https://huggingface.co/docs/lerobot/en/so101#calibration-video)
   - Click **Calibrating** again to save calibration data
 - Click **Play** to begin controlling your Lekiwi 😄
+
+---
+
