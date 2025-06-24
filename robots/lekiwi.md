@@ -56,7 +56,7 @@ libcurl4-openssl-dev libssl-dev
 
 #### Download Teleop Agent
 
-Download [teleop-agent.run](https://github.com/frodobots-org/robots-connect/) to your Pi.
+Download [teleop agent](https://github.com/frodobots-org/robots-connect/releases/download/v0.0.1-alpha/teleop-agent.lekiwi.run.tgz) to your Pi.
 
 #### Configure Teleop Agent
 
