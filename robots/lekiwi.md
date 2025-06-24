@@ -1,0 +1,18 @@
+# Lekiwi
+
+
+## Update config
+
+```ini
+[teleop]
+token = <your token> 
+video = 2
+audio = 0
+
+[plugin]
+media = libteleop_media_gst.so
+ctrl = libteleop_ctrl_zmq.so
+pipeline1 = v4l2src device=/dev/video0 ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 bitrate=2048 bframes=0 ! appsink name=sink sync=false
+pipeline2 = v4l2src device=/dev/video2 ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 bitrate=1024 bframes=0 ! appsink name=sink sync=false
+```
+
