@@ -3,7 +3,7 @@
 #include <gst/gst.h>
 #include "teleop_media_plugin.h"
 
-#define PIPELINE "v4l2src device=/dev/video2 ! video/x-raw, width=640, height=480, framerate=30/1 ! nvvidconv ! nvv4l2h264enc bitrate=1000000 insert-sps-pps=true disable-cabac=true qp-range=30,45:30,45:30,45 idrinterval=30 maxperf-enable=1 ! appsink name=sink sync=false"
+#define PIPELINE "v4l2src device=/dev/video0 ! video/x-raw, width=640, height=480, framerate=30/1 ! nvvidconv ! nvv4l2h264enc bitrate=1000000 insert-sps-pps=true disable-cabac=true qp-range=30,45:30,45:30,45 idrinterval=30 maxperf-enable=1 ! appsink name=sink sync=false"
 
 class TeleopMediaGst : public TeleopMediaPlugin {
  public:
