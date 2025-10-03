@@ -1,6 +1,7 @@
 #ifndef TELEOP_CTRL_PLUGIN_H_
 #define TELEOP_CTRL_PLUGIN_H_
 
+#include <string>
 #include <stdint.h>
 
 typedef void (*SendMessageImpl)(const char*, size_t);
