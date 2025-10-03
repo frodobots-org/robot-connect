@@ -1,5 +1,5 @@
-# Robots Connect SDK
-Robots Connect SDK allows users to quickly build a remote teleoperation system for robots. It provides a simple web interface for validation and testing, as well as a Python API for integrating backend services. The SDK also supports extensible plugins for customization and deployment across different robots.
+# Teleop Device SDK
+Teleop Device SDK allows users to quickly build a remote teleoperation system for robots. It provides a simple web interface for validation and testing, as well as a Python API for integrating backend services. The SDK also supports extensible plugins for customization and deployment across different robots.
 
 <img src="https://github.com/user-attachments/assets/1d05fed9-2940-4f46-88b8-2f1fe940f8eb" width="640"/>
 
@@ -23,8 +23,8 @@ Robots Connect SDK allows users to quickly build a remote teleoperation system f
 
 ## Robots
 
-| LeKiwi       | EarthRover Mini+ | Nvdia Jeston |
-|--------------|------------------|--------------|
-| <img src="https://github.com/SIGRobotics-UIUC/LeKiwi/raw/main/media/lekiwi_real.jpg" width="200"/>  | <img src="https://shop.frodobots.com/cdn/shop/files/6s.jpg?v=1748002022" width="200"/> | |
-| [Getting Started](https://github.com/frodobots-org/robots-connect/blob/main/robots/lekiwi.md)  | Coming soon    | [Getting Started](https://github.com/frodobots-org/robots-connect/blob/main/robots/jetson.md) |
+| LeKiwi       | XLerobot |  EarthRover Mini+ | Nvdia Jeston |
+|--------------|----------|--------|--------------|
+| <img src="https://github.com/SIGRobotics-UIUC/LeKiwi/raw/main/media/lekiwi_real.jpg" width="200"/> | <img src="https://shop.wowrobo.com/cdn/shop/files/en-01.jpg?v=1757607447" width="200"/> | <img src="https://shop.frodobots.com/cdn/shop/files/6s.jpg?v=1748002022" width="200"/> | <img src="https://www.nvidia.com/zh-tw/autonomous-machines/embedded-systems/jetson-nano/product-development/_jcr_content/root/responsivegrid/nv_container_1169488117/nv_container/nv_image.coreimg.100.630.jpeg/1719331834676/jetsonnano2-chip-2560x1440.jpeg" width="200"/> |
+| [Getting Started](https://github.com/frodobots-org/robot-connect/tree/main/plugins/lekiwi)  | Coming soon | [Getting Started](https://github.com/frodobots-org/robot-connect/tree/main/plugins/earth-rover)    | [Getting Started](https://github.com/frodobots-org/robot-connect/tree/main/plugins/jetson) |
 
