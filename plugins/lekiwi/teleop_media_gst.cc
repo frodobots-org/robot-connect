@@ -1,7 +1,11 @@
 #include <iostream>
 #include <thread>
 #include <gst/gst.h>
+#include <set>
 #include "teleop_media_plugin.h"
+
+const int kFrontCameraId = 1000001;
+const int kWristCameraId = 1100001;
 
 uint64_t get_timestamp_ms() {
   struct timespec ts;
@@ -75,6 +79,7 @@ class TeleopMediaGst : public TeleopMediaPlugin {
   bool is_running_;
   static GstFlowReturn OnVideoSampleMajor(GstElement* sink, gpointer user_data);
   static GstFlowReturn OnVideoSampleMinor(GstElement* sink, gpointer user_data);
+  std::set<int> user_ids_;
 };
 
 TeleopMediaGst::TeleopMediaGst() {
@@ -123,13 +128,34 @@ GstFlowReturn TeleopMediaGst::OnVideoSampleMinor(GstElement* sink, gpointer user
 
 
 void TeleopMediaGst::OnEvent(const char* event_name, const void* data) {
+  if (strncmp(event_name, "video.user_joined", strlen("video.user_joined")) == 0) {
+    int user_id = *static_cast<const int*>(data);
+    if (user_id != kFrontCameraId && user_id != kWristCameraId) {
+      user_ids_.insert(user_id);
+    }
+  } else if (strncmp(event_name, "video.user_offline", strlen("video.user_offline")) == 0) {
+    int user_id = *static_cast<const int*>(data);
+    if (user_id != kFrontCameraId && user_id != kWristCameraId) {
+      user_ids_.erase(*static_cast<const int*>(data));
+    }
+  }
+
+  if (user_ids_.empty()) {
+    printf("No users online, stopping pipeline.\n");
+    gst_element_set_state(pipeline1_, GST_STATE_NULL);
+    gst_element_set_state(pipeline2_, GST_STATE_NULL);
+  } else {
+    printf("Users online: %zu, starting pipeline.\n", user_ids_.size());
+    gst_element_set_state(pipeline1_, GST_STATE_PLAYING);
+    gst_element_set_state(pipeline2_, GST_STATE_PLAYING);
+  }
 }
 
 
 void TeleopMediaGst::Invoke() {
   gst_init(NULL, NULL);
   is_running_ = true;
-  std::string encode_pipeine = " ! videoconvert ! video/x-raw, format=I420, width=640, height=480 ! identity name=id ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 bitrate=1024 bframes=0 ! appsink name=sink sync=false";
+  std::string encode_pipeine = " ! videoconvert ! video/x-raw, format=I420, width=640, height=480 ! identity name=id ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=30 bitrate=1024 bframes=0 ! appsink name=sink sync=false";
   
   if (config_.count("camera1") && !config_["camera1"].empty()) {
     std::string pipeline1 = config_["camera1"] + encode_pipeine;
@@ -139,7 +165,6 @@ void TeleopMediaGst::Invoke() {
     g_signal_connect(identity1_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
     g_signal_connect(appsink1_, "new-sample", G_CALLBACK(OnVideoSampleMinor), this);
     g_object_set(appsink1_, "emit-signals", TRUE, NULL);
-    gst_element_set_state(pipeline1_, GST_STATE_PLAYING);
   }
 
   if (config_.count("camera2") && !config_["camera2"].empty()) {
@@ -150,7 +175,6 @@ void TeleopMediaGst::Invoke() {
     g_signal_connect(identity2_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
     g_signal_connect(appsink2_, "new-sample", G_CALLBACK(OnVideoSampleMajor), this);
     g_object_set(appsink2_, "emit-signals", TRUE, NULL);
-    gst_element_set_state(pipeline2_, GST_STATE_PLAYING);
   }
 
   while (is_running_) {

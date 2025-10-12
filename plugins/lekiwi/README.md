@@ -96,7 +96,7 @@ teleop_agent <your teleop.ini file>
 ---
 
 ## 3. Start Controlling Lekiwi
-- Go to the 👉 [Robots Connect Dashboard](https://robots-connect.netlify.app/dashboard)
+- Go to the 👉 [Dashboard](https://robots-connect.netlify.app/dashboard)
 - Click **Drive** to enter the control interface
 
 ## 4. Join [TeleArms](https://telearms.com/) subnet (Optional)
