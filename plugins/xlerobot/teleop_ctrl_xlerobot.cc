@@ -229,7 +229,10 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
 }
 
 void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
-
+  if (data != nullptr) 
+  {
+    std::cout << "接收到的外部输入数据：" << data << std::endl;
+  }
   size_t len = std::strlen(data);
   if (is_running_) {
 
@@ -318,7 +321,7 @@ void TeleopCtrlXLerobot::PullThread() {
         observation_ = json::parse(received);
       }
 
-      //std::cout << "observation: " << received << std::endl;
+      std::cout << "observation: " << received << std::endl;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
