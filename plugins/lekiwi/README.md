@@ -53,7 +53,7 @@ python teleoperator.py
 apt install -y
 apt install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
 gstreamer1.0-plugins-ugly libzmq3-dev \
-libcurl4-openssl-dev libssl-dev
+libcurl4-openssl-dev libssl-dev libgstreamer1.0-dev nlohmann-json3-dev cmake
 ```
 
 ### Build plugin for lekiwi
@@ -81,8 +81,10 @@ audio = 0
 [plugin]
 media = <your plugins path>/libteleop_media_gst.so
 ctrl = <your plugins path>/libteleop_ctrl_zmq.so
-pipeline1 = v4l2src device=/dev/video0 ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 bitrate=2048 bframes=0 ! appsink name=sink sync=false
-pipeline2 = v4l2src device=/dev/video2 ! videoconvert ! x264enc tune=zerolatency speed-preset=ultrafast key-int-max=60 bitrate=1024 bframes=0 ! appsink name=sink sync=false
+# camera2: front camera
+# camera1: wrist camera
+camera1 = v4l2src device=/dev/video0
+camera2 = v4l2src device=/dev/video2
 ```
 
 ### Run the Agent

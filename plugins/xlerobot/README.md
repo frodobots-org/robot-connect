@@ -7,7 +7,7 @@
 apt install -y
 apt install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
 gstreamer1.0-plugins-ugly libzmq3-dev \
-libcurl4-openssl-dev libssl-dev
+libcurl4-openssl-dev libssl-dev libgstreamer1.0-dev nlohmann-json3-dev cmake
 ```
 
 ### Build plugin for xlerobot

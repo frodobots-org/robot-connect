@@ -226,7 +226,7 @@ void TeleopCtrlZmq::Invoke() {
         action_["theta.vel"]
       };
 
-      IngestTelemetry(observation.data(), observation.size(), action.data(), action.size());
+      //IngestTelemetry(observation.data(), observation.size(), action.data(), action.size());
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
