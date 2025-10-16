@@ -218,10 +218,26 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
     if (data["buttons"][15].get<double>() > 0) {
       keyboard_action["x"] = true;
     }
-
+	if (15 >= buttons.size()) {
+ 	 std::cerr << "[ERROR] buttons[15] is out of range (size: " << buttons.size() << ")" << std::endl;
+	} 
+	else {
+ 	 if (buttons[15].get<double>() > 0) {
+   		 keyboard_action["x"] = true;
+  			}
+	}
+	  
     if (data["buttons"][14].get<double>() > 0) {
       keyboard_action["z"] = true;
     }
+	  if (14 >= buttons.size()) {
+ 	 std::cerr << "[ERROR] buttons[14] is out of range (size: " << buttons.size() << ")" << std::endl;
+	}
+	  else {
+  		if (buttons[14].get<double>() > 0) {
+    			keyboard_action["z"] = true;
+  			}
+	}
 
   }
   action_string = keyboard_action.dump();
