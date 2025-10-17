@@ -263,6 +263,7 @@ void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
     }
 
     if (action_string.length() > 0) {
+	  std::cout << "Ctrl plugin 正在发送消息到Python，内容：" << action_string << std::endl;
       zmq::message_t message(action_string.c_str(), action_string.length());
       socket_action_.send(message, zmq::send_flags::none);
     }
