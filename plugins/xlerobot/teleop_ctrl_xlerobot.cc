@@ -35,7 +35,7 @@ class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
   zmq::context_t context_;
   zmq::socket_t socket_action_;
   zmq::socket_t socket_observation_;
-  std::atomic<bool> is_running_ = false;
+  std::atomic<bool> is_running_{false}; 
   std::thread pull_thread_;
   json action_;
   json observation_;
