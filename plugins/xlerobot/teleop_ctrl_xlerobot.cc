@@ -53,11 +53,13 @@ void TeleopCtrlXLerobot::ProcessKeyboardAction(const json& action,
   json keyboard_action = json::object();
   if (action.contains("data")) {
     auto data = action["data"];
-    for (auto const& [key, value] : data.items()) {
-      if (!(value.is_boolean() && value == false)) {
-        keyboard_action[key] = value;
-      }
-    }
+	for (auto const& item : data.items()) {
+	    const auto& key = item.key();
+	    const auto& value = item.value();
+	    if (!(value.is_boolean() && value == false)) {
+	        keyboard_action[key] = value;
+	    }
+	}
   }
   action_string = keyboard_action.dump();
 }
