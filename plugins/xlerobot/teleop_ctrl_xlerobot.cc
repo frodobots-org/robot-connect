@@ -32,6 +32,7 @@ class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
 
  private:
   void PullThread();
+  double GetButtonValue(const json& buttons, int index);
   zmq::context_t context_;
   zmq::socket_t socket_action_;
   zmq::socket_t socket_observation_;
@@ -47,18 +48,26 @@ TeleopCtrlXLerobot::TeleopCtrlXLerobot() : context_(1),
                                  socket_action_(context_, zmq::socket_type::push),
                                  socket_observation_(context_, zmq::socket_type::pull) {
 }
-
+double TeleopCtrlXLerobot::GetButtonValue(const json& buttons, int index) {
+  
+  if (index < 0 || static_cast<size_t>(index) >= buttons.size()) {
+    std::cerr << "[ERROR] buttons[" << index << "] out of range (size: " << buttons.size() << ")" << std::endl;
+    return 0.0;
+  }
+  return buttons[index].get<double>();
+}
 void TeleopCtrlXLerobot::ProcessKeyboardAction(const json& action,
     std::string& action_string) {
   json keyboard_action = json::object();
   if (action.contains("data")) {
     auto data = action["data"];
-	for (auto const& item : data.items()) {
-	    const auto& key = item.key();
-	    const auto& value = item.value();
-	    if (!(value.is_boolean() && value == false)) {
-	        keyboard_action[key] = value;
-	    }
+
+    for (auto const& item : data.items()) {
+  	  const auto& key = item.key();
+  	  const auto& value = item.value();
+   	 if (!(value.is_boolean() && value == false)) {
+       		 keyboard_action[key] = value;
+   		 }
 	}
   }
   action_string = keyboard_action.dump();
@@ -78,15 +87,15 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
     // 3: head control
 
     // right hand
-    if (data["buttons"][7].get<double>() > 0 && data["buttons"][2].get<double>() > 0) {
+    if (GetButtonValue(data["buttons"], 7) > 0 && GetButtonValue(data["buttons"], 2) > 0) {
       keyboard_action["p"] = true;
     }
 
-    if (data["buttons"][5].get<double>() > 0 && data["buttons"][7].get<double>() > 0) {
+    if (GetButtonValue(data["buttons"], 5) > 0 && GetButtonValue(data["buttons"], 7) > 0) {
       right_mode = 2;
-    } else if (data["buttons"][5].get<double>() > 0) {
+    } else if (GetButtonValue(data["buttons"], 5) > 0) { 
       right_mode = 1;
-    } else if (data["buttons"][7].get<double>() > 0) {
+    } else if (GetButtonValue(data["buttons"], 7) > 0) {
       right_mode = 3;
     }
 
@@ -113,12 +122,11 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
       }
 
       // axis z
-      if (data["buttons"][3].get<double>() > 0) {
-        keyboard_action["y"] = true;
+      if (GetButtonValue(data["buttons"], 3) > 0) {
+	  keyboard_action["y"] = true;
       }
- 
-      if (data["buttons"][0].get<double>() > 0) {
-        keyboard_action["i"] = true;
+      if (GetButtonValue(data["buttons"], 0) > 0) {
+          keyboard_action["i"] = true;
       }
 
     } else if (right_mode == 2) {
@@ -146,22 +154,22 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
     }
 
     // right gripper
-    if (data["buttons"][1].get<double>() > 0) {
-      keyboard_action["n"] = true;
+    if (GetButtonValue(data["buttons"], 1) > 0) {
+       keyboard_action["n"] = true;
     }
-
-    if (data["buttons"][2].get<double>() > 0) {
-      keyboard_action["b"] = true;
+    if (GetButtonValue(data["buttons"], 2) > 0) {
+       keyboard_action["b"] = true;
     }
 
     // left arm
-    if (data["buttons"][6].get<double>() > 0 && data["buttons"][15].get<double>() > 0) {
+        if (GetButtonValue(data["buttons"], 6) > 0 && GetButtonValue(data["buttons"], 15) > 0) {
       keyboard_action["c"] = true;
     }
 
-    if (data["buttons"][4].get<double>() > 0 && data["buttons"][6].get<double>() > 0) {
+ 
+    if (GetButtonValue(data["buttons"], 4) > 0 && GetButtonValue(data["buttons"], 6) > 0) {
       left_mode = 2;
-    } else if (data["buttons"][4].get<double>() > 0) {
+    } else if (GetButtonValue(data["buttons"], 4) > 0) {
       left_mode = 1;
     }
 
@@ -194,11 +202,10 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
       }
 
       // axis z
-      if (data["buttons"][12].get<double>() > 0) {
+      if (GetButtonValue(data["buttons"], 12) > 0) {
         keyboard_action["q"] = true;
       }
- 
-      if (data["buttons"][13].get<double>() > 0) {
+      if (GetButtonValue(data["buttons"], 13) > 0) {
         keyboard_action["e"] = true;
       }
 
@@ -217,22 +224,12 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
     }
 
     // left gripper
-	auto& buttons = data["buttons"];
-	if (15 >= buttons.size()) {
-  			std::cerr << "[ERROR] buttons[15] is out of range (size: " << buttons.size() << ")" << std::endl;
-		} else {
-  	if (buttons[15].get<double>() > 0) {
-    		keyboard_action["x"] = true;
-  		}
-	}
-
-	if (14 >= buttons.size()) {
-  			std::cerr << "[ERROR] buttons[14] is out of range (size: " << buttons.size() << ")" << std::endl;
-		} else {
- 	if (buttons[14].get<double>() > 0) {
-    	keyboard_action["z"] = true;
-  		}
-		}
+	if (GetButtonValue(data["buttons"], 15) > 0) {
+         keyboard_action["x"] = true;
+       }
+    	if (GetButtonValue(data["buttons"], 14) > 0) {
+      	  keyboard_action["z"] = true;
+    }
   }
   action_string = keyboard_action.dump();
  // std::cout << action_string << std::endl;
@@ -263,7 +260,6 @@ void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
     }
 
     if (action_string.length() > 0) {
-	  std::cout << "Ctrl plugin 正在发送消息到Python，内容：" << action_string << std::endl;
       zmq::message_t message(action_string.c_str(), action_string.length());
       socket_action_.send(message, zmq::send_flags::none);
     }
@@ -281,8 +277,8 @@ void TeleopCtrlXLerobot::Terminate() {
 }
 
 void TeleopCtrlXLerobot::Invoke() {
-  socket_action_.connect("tcp://172.17.0.2:5558");
-  socket_observation_.connect("tcp://172.17.0.2:5556");
+  socket_action_.connect("tcp://192.168.1.92:5558");
+  socket_observation_.connect("tcp://192.168.1.92:5556");
   is_running_ = true;
   printf("Connected\n");
   pull_thread_ = std::thread(&TeleopCtrlXLerobot::PullThread, this);
