@@ -89,3 +89,9 @@ Start the agent using the config file:
 ```bash
 /opt/frodobots/teleop.sh
 ```
+---
+## 3. Start Controlling XLeRobot
+- Go to the 👉 [Dashboard](https://robots-connect.netlify.app/dashboard)
+- Click **Drive** to enter the control interface
+## 4. Join [TeleArms](https://telearms.com/) subnet (Optional)
+- Contact us to get your token for TeleArms
