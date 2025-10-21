@@ -24,7 +24,7 @@ gstreamer1.0-plugins-ugly libzmq3-dev \
 libcurl4-openssl-dev libssl-dev libgstreamer1.0-dev nlohmann-json3-dev cmake
 ```
 
-### Install and shake configuration
+### Install and configure the shaking operation
 ```bash
 cd teleop-device-sdk/plugins/xlerobot
 cp -r frodobots /opt
