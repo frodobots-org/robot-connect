@@ -5,6 +5,15 @@
 Follow the installation and calibration steps from the official docs:  
 👉 [https://xlerobot.readthedocs.io/zh-cn/latest/software/index.html](https://xlerobot.readthedocs.io/zh-cn/latest/software/index.html)
 
+### Start the end effector based control
+(Activate your env before run the command)
+```bash
+git clone https://github.com/frodobots-org/teleop-device-sdk.git
+cd teleop-device-sdk/plugins/xlerobot
+cp 99_xlerobot_teleop_keyboard.py /home/user/lerobot/example/ #one's own local path
+python3.10 99_xlerobot_teleop_keyboard.py
+```
+
 ### Install Dependencies
 ```bash
 apt install -y
