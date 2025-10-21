@@ -31,11 +31,9 @@ cp -r frodobots /opt
 ```
 
 ### Build plugin for xlerobot
-```
 cd teleop-device-sdk/plugins/xlerobot
-
-#Modify a teleop_ctrl_xlerobot.cc file
 ```diff
+#Modify a teleop_ctrl_xlerobot.cc file
 --- a/teleop-device-sdk/plugins/xlerobot/teleop_ctrl_xlerobot.cc
 +++ b/teleop-device-sdk/plugins/xlerobot/teleop_ctrl_xlerobot.cc
 @@ -279,7 +279,7 @@ void TeleopCtrlXLerobot::Invoke() {
@@ -45,7 +43,7 @@ cd teleop-device-sdk/plugins/xlerobot
   printf("Connected\n");
   pull_thread_ = std::thread(&TeleopCtrlXLerobot::PullThread, this);
 ```
-
+```
 mkdir build
 cd build
 cmake ..
