@@ -1,6 +1,9 @@
 ## Xlerobot
 
-## Running the Teleop Agent on Pi
+## 1. Install XLeRobot on Pi
+
+Follow the installation and calibration steps from the official docs:  
+👉 [https://xlerobot.readthedocs.io/zh-cn/latest/software/index.html](https://xlerobot.readthedocs.io/zh-cn/latest/software/index.html)
 
 ### Install Dependencies
 ```bash
