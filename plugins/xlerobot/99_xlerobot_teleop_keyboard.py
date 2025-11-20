@@ -12,6 +12,11 @@ import time
 import numpy as np
 import math
 import threading
+#11.11
+import csv
+from datetime import datetime
+import os
+#11.11
 
 from lerobot.robots.xlerobot import XLerobotClient, XLerobotConfig, XLerobot
 from lerobot.utils.robot_utils import busy_wait
@@ -23,18 +28,29 @@ import json
 import zmq
 
 action_cmd = {}
+#new11.06
+FIXED_X = 0
+FIXED_Y = 0
+FIXED_PITCH = 0
+#new 11.06
+#new10.29
+last_cmd_time = time.time()
+TIMEOUT = 0.9
+#new10.29
+
 
 def zmq_thread():
     zmq_context = zmq.Context()
     zmq_cmd_socket = zmq_context.socket(zmq.PULL)
     zmq_cmd_socket.setsockopt(zmq.CONFLATE, 1)
     zmq_cmd_socket.bind(f"tcp://*:5558")
-    global action_cmd
+    global action_cmd,last_cmd_time  #new10.29
     while True:
         try:
             msg = zmq_cmd_socket.recv_string()
             print(msg)
             action_cmd = dict(json.loads(msg))
+            last_cmd_time = time.time() #new10.29
         except zmq.Again:
             #action_cmd = {}
             pass
@@ -227,7 +243,7 @@ class SimpleTeleopArm:
         self.pitch = 0.0
         # Set the degree step and xy step
         self.degree_step = 1
-        self.xy_step = 0.0021
+        self.xy_step = 0.0042
         # Set target positions to zero for P control
         self.target_positions = {
             "shoulder_pan": 0.0,
@@ -267,6 +283,27 @@ class SimpleTeleopArm:
         
         action = self.p_control_action(robot)
         robot.send_action(action)
+
+    #new11.06
+    def move_to_fixed_position(self, robot):
+        if self.prefix == "left":
+            self.current_x = FIXED_X
+            self.current_y = FIXED_Y
+            self.pitch = FIXED_PITCH
+        else:
+            self.current_x = FIXED_X
+            self.current_y = FIXED_Y
+            self.pitch = FIXED_PITCH
+        
+        joint2, joint3 = self.kinematics.inverse_kinematics(self.current_x, self.current_y)
+        self.target_positions["shoulder_lift"] = joint2
+        self.target_positions["elbow_flex"] = joint3
+
+        self.target_positions["wrist_flex"] = -joint2 - joint3 + self.pitch
+        
+        action = self.p_control_action(robot)
+        robot.send_action(action)
+    #new11.06
 
     def execute_rectangular_trajectory(self, robot, fps=30):
         """
@@ -457,6 +494,37 @@ def main():
         print(robot_config)
         print(robot)
         return
+    
+    #11.11 
+    all_motors = list(robot.bus1.motors.keys()) + list(robot.bus2.motors.keys())
+    current_fields = [f"{motor}_current" for motor in all_motors]
+    temp_fields = [f"{motor}_temp" for motor in all_motors]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_dir = "motor_current_data"
+    os.makedirs(save_dir, exist_ok=True)
+    csv_path = os.path.join(save_dir, f"current_data_{timestamp}.csv")
+
+    with open(csv_path, mode='w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=["timestamp"] + current_fields + temp_fields)
+        writer.writeheader()
+
+    csv_file = open(csv_path, mode='a', newline='')
+    csv_writer = csv.DictWriter(csv_file, fieldnames=["timestamp"] + current_fields + temp_fields)
+
+    #Read the angle
+    angle_save_dir = "motor_angle_data"
+    os.makedirs(angle_save_dir, exist_ok=True)
+    angle_fields = ["timestamp", "obs"]
+    angle_csv_path = os.path.join(angle_save_dir, f"angle_data_{timestamp}.csv")
+
+    with open(angle_csv_path, mode='w', newline='') as f:
+        angle_writer = csv.DictWriter(f, fieldnames=angle_fields)
+        angle_writer.writeheader()
+    angle_csv_file = open(angle_csv_path, mode='a', newline='')
+    angle_csv_writer = csv.DictWriter(angle_csv_file, fieldnames=angle_fields)
+    
+
+    #11.11
         
     #_init_rerun(session_name="xlerobot_teleop_v2")
 
@@ -474,17 +542,56 @@ def main():
     head_control = SimpleHeadControl(obs)
 
     # Move both arms and head to zero position at start
-    left_arm.move_to_zero_position(robot)
-    right_arm.move_to_zero_position(robot)
+    left_arm.move_to_fixed_position(robot)
+    right_arm.move_to_fixed_position(robot)
+    
     global action_cmd
+
+    #11.11Temperature alarm
+    temp_threshold = 65
+    consecutive_over_temp = 0
+    over_temp_alert = False
+    cooldown_needed = False
+    #11.11Temperature alarm
+
     try:
         while True:
+            #new 10.29
+            current_time = time.time()
+            if current_time - last_cmd_time > TIMEOUT:
+                #11.06
+                left_arm.move_to_fixed_position(robot)
+                right_arm.move_to_fixed_position(robot)
+                #11.06
+                time.sleep(1.0 / FPS)
+                continue
+                #new 10.29
             #pressed_keys = set(keyboard.get_action().keys())
             if 'arm_wrist_roll.pos' not in action_cmd:
                 pressed_keys = {k: v for k, v in action_cmd.items() if v}
             print(pressed_keys)
             left_key_state = {action: (key in pressed_keys) for action, key in LEFT_KEYMAP.items()}
             right_key_state = {action: (key in pressed_keys) for action, key in RIGHT_KEYMAP.items()}
+
+            # 11.11Temperature alarm
+            if cooldown_needed:
+                all_below_threshold = all(temp <= temp_threshold for temp in all_temp.values())
+                
+                if all_below_threshold:
+                    print(f"[ALERT] The temperature has dropped to a safe level ({temp_threshold}°C以下)，恢复控制")
+                    cooldown_needed = False
+                    consecutive_over_temp = 0 
+                else:
+                    print(f"[ALERT] Wait for the temperature to cool down, the current maximum temperature: {max(all_temp.values())}°C")
+                    time.sleep(1) 
+                    continue 
+            # 11.11Temperature alarm
+
+            # Handle rectangular trajectory for left arm (y key)
+            if left_key_state.get('triangle'):
+                print("[MAIN] Left arm rectangular trajectory triggered!")
+                left_arm.execute_rectangular_trajectory(robot, fps=FPS)
+                continue
 
             # Handle rectangular trajectory for left arm (y key)
             if left_key_state.get('triangle'):
@@ -529,6 +636,81 @@ def main():
             robot.send_action(action)
 
             obs = robot.get_observation()
+            angle_values = []
+            act_values = []
+            for motor in all_motors:
+                angle = obs.get(f"{motor}.pos", 0.0)
+                angle_values.append(angle)
+                act_val = action.get(f"{motor}.pos", angle) 
+                act_values.append(act_val)
+            
+            current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S.%f")
+            angle_row = {
+                "timestamp": current_time_str,
+                "obs": json.dumps({"obs": angle_values, "act": act_values})  # 新增act字段
+            }
+            angle_csv_writer.writerow(angle_row)
+
+            #11.11
+            current_bus1 = robot.bus1.sync_read("Present_Current")
+            current_bus2 = robot.bus2.sync_read("Present_Current")
+            all_current = {**current_bus1, **current_bus2}
+
+            temp_bus1 = robot.bus1.sync_read("Present_Temperature")
+            temp_bus2 = robot.bus2.sync_read("Present_Temperature")
+            all_temp = {**temp_bus1, **temp_bus2}
+            
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+            print(f"\n[{current_time_str}] motor current and temperature:")
+            for motor in all_motors:
+                print(f"  {motor}: current={all_current.get(motor, 0)}mA, temp={all_temp.get(motor, 0)}°C", end="; ")
+            print()
+            
+            csv_row = {"timestamp": current_time_str}
+            for motor in all_motors:
+                csv_row[f"{motor}_current"] = all_current.get(motor, 0)
+            for motor in all_motors:
+                csv_row[f"{motor}_temp"] = all_temp.get(motor, 0)
+
+            csv_writer.writerow(csv_row)
+            #11.11
+
+            # 11.11Temperature alarm
+            any_over_temp = any(temp > temp_threshold for temp in all_temp.values())
+            
+            if any_over_temp:
+                consecutive_over_temp += 1
+                print(f"[WARNING] temperature exceeds{temp_threshold}°C,counting: {consecutive_over_temp}")
+                
+                if consecutive_over_temp >= 3:
+                    print(f"[ALERT] Three consecutive times the temperature exceeds{temp_threshold}°C,The robotic arm stops.")
+
+                    robot.bus1.disable_torque()
+                    robot.bus2.disable_torque()
+
+                    time.sleep(10)
+                    robot.bus1.enable_torque()
+                    robot.bus2.enable_torque()
+                    time.sleep(5)
+                    left_arm.move_to_zero_position(robot)
+                    right_arm.move_to_zero_position(robot)
+                    
+                    time.sleep(10)
+                    left_arm.move_to_fixed_position(robot)
+                    right_arm.move_to_fixed_position(robot)
+                    head_control.move_to_zero_position(robot)
+                
+                    print(f"[ALERT] The robotic arm resets and pauses for 10 seconds.")
+                    
+                    
+                    cooldown_needed = True
+            else:
+
+                consecutive_over_temp = 0
+
+
+            obs = robot.get_observation()
             head1_angle = obs.get("head_motor_1.pos", 0.0)
             head2_angle = obs.get("head_motor_2.pos", 0.0)
             left_gripper_angle = obs.get("left_arm_gripper.pos", 0.0)
@@ -539,6 +721,10 @@ def main():
             #log_rerun_data(obs, action)
             # busy_wait(1.0 / FPS)
     finally:
+        #11.11
+        csv_file.close()
+        #11.11
+        angle_csv_file.close()
         robot.disconnect()
         #keyboard.disconnect()
         print("Teleoperation ended.")
