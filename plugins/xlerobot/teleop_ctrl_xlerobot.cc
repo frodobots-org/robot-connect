@@ -8,7 +8,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <teleop_ctrl_plugin.h>
-:
+
 using json = nlohmann::json;
 
 class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
@@ -272,8 +272,8 @@ void TeleopCtrlXLerobot::Terminate() {
 }
 
 void TeleopCtrlXLerobot::Invoke() {
-  socket_action_.connect("tcp://192.168.1.92:5558");
-  socket_report_.connect("tcp://192.168.1.92:5559");
+  socket_action_.connect("tcp://localhost:5558");
+  socket_report_.connect("tcp://localhost:5559");
   is_running_ = true;
   printf("Connected\n");
   while (is_running_) {
