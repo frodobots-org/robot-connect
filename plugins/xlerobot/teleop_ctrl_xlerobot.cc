@@ -8,7 +8,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <teleop_ctrl_plugin.h>
-
+:
 using json = nlohmann::json;
 
 class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
@@ -31,22 +31,20 @@ class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
   void ProcessGamepadAction(const json& action, std::string& action_string);
 
  private:
-  void PullThread();
   double GetButtonValue(const json& buttons, int index);
   zmq::context_t context_;
   zmq::socket_t socket_action_;
-  zmq::socket_t socket_observation_;
+  zmq::socket_t socket_report_;
   std::atomic<bool> is_running_{false}; 
-  std::thread pull_thread_;
   json action_;
-  json observation_;
+  json report_;
   std::mutex lock_;
 };
 
 TeleopCtrlXLerobot::TeleopCtrlXLerobot() : context_(1),
                                  is_running_(false),
                                  socket_action_(context_, zmq::socket_type::push),
-                                 socket_observation_(context_, zmq::socket_type::pull) {
+                                 socket_report_(context_, zmq::socket_type::pull) {
 }
 double TeleopCtrlXLerobot::GetButtonValue(const json& buttons, int index) {
   
@@ -246,7 +244,7 @@ void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
     {
       std::lock_guard<std::mutex> lock(lock_); 
       if (!action_.contains("arm_gripper.pos")) {
-        action_ = observation_;
+        action_ = report_;
       }
     }
     std::string action_string;
@@ -268,67 +266,31 @@ void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
 
 void TeleopCtrlXLerobot::Terminate() {
   is_running_ = false;
-  if (pull_thread_.joinable()) {
-    pull_thread_.join();
-  }
   socket_action_.close();
-  socket_observation_.close();
+  socket_report_.close();
   context_.close();
 }
 
 void TeleopCtrlXLerobot::Invoke() {
   socket_action_.connect("tcp://192.168.1.92:5558");
-  socket_observation_.connect("tcp://192.168.1.92:5556");
+  socket_report_.connect("tcp://192.168.1.92:5559");
   is_running_ = true;
   printf("Connected\n");
-  pull_thread_ = std::thread(&TeleopCtrlXLerobot::PullThread, this);
-  while (is_running_) {
-    if (is_recording_) {
-      //std::cout << observation_ << std::endl;
-
-      std::vector<float> observation = {
-        observation_["arm_shoulder_pan.pos"],
-        observation_["arm_shoulder_lift.pos"],
-        observation_["arm_wrist_flex.pos"],
-        observation_["arm_elbow_flex.pos"],
-        observation_["arm_wrist_roll.pos"],
-        observation_["arm_gripper.pos"],
-        observation_["x.vel"],
-        observation_["y.vel"],
-        observation_["theta.vel"]
-      };
-
-      std::vector<float> action = {
-        action_["arm_shoulder_pan.pos"],
-        action_["arm_shoulder_lift.pos"],
-        action_["arm_wrist_flex.pos"],
-        action_["arm_elbow_flex.pos"],
-        action_["arm_wrist_roll.pos"],
-        action_["arm_gripper.pos"],
-        action_["x.vel"],
-        action_["y.vel"],
-        action_["theta.vel"]
-      };
-
-      //IngestTelemetry(observation.data(), observation.size(), action.data(), action.size());
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
-}
-
-void TeleopCtrlXLerobot::PullThread() {
   while (is_running_) {
     zmq::message_t msg;
-    zmq::recv_result_t result = socket_observation_.recv(msg, zmq::recv_flags::dontwait);
+    zmq::recv_result_t result = socket_report_.recv(msg, zmq::recv_flags::dontwait);
     if (result) {
       std::string received(static_cast<char*>(msg.data()), msg.size());
 
       {
         std::lock_guard<std::mutex> lock(lock_); 
-        observation_ = json::parse(received);
+        report_ = json::parse(received);
+        std::vector<float> obs = report_["obs"].get<std::vector<float>>();
+        std::vector<float> act = report_["act"].get<std::vector<float>>();
+        IngestTelemetry(obs.data(), obs.size(), act.data(), act.size());
       }
 
-      std::cout << "observation: " << received << std::endl;
+      //std::cout << "observation: " << received << std::endl;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
