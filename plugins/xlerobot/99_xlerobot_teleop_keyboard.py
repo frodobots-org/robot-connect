@@ -18,12 +18,6 @@ from datetime import datetime
 import os
 #11.11
 
-from lerobot.robots.xlerobot import XLerobotClient, XLerobotConfig, XLerobot
-from lerobot.utils.robot_utils import busy_wait
-#from lerobot.utils.visualization_utils import _init_rerun, log_rerun_data
-from lerobot.model.SO101Robot import SO101Kinematics
-#from lerobot.teleoperators.keyboard.teleop_keyboard import KeyboardTeleop, KeyboardTeleopConfig
-
 import json
 import zmq
 
@@ -37,15 +31,15 @@ FIXED_PITCH = 0
 last_cmd_time = time.time()
 TIMEOUT = 0.9
 #new10.29
-
+is_running = True
 
 def zmq_thread():
     zmq_context = zmq.Context()
     zmq_cmd_socket = zmq_context.socket(zmq.PULL)
     zmq_cmd_socket.setsockopt(zmq.CONFLATE, 1)
     zmq_cmd_socket.bind(f"tcp://*:5558")
-    global action_cmd,last_cmd_time  #new10.29
-    while True:
+    global action_cmd,last_cmd_time,is_running  #new10.29
+    while is_running:
         try:
             msg = zmq_cmd_socket.recv_string()
             print(msg)
@@ -57,9 +51,6 @@ def zmq_thread():
         except Exception as e:
             action_cmd = {}
             print("Message fetching failed: %s", e)
-
-t = threading.Thread(target=zmq_thread, daemon=True)
-t.start()
 
 # Keymaps (semantic action: key)
 LEFT_KEYMAP = {
@@ -94,6 +85,7 @@ LEFT_JOINT_MAP = {
     "wrist_roll": "left_arm_wrist_roll",
     "gripper": "left_arm_gripper",
 }
+
 RIGHT_JOINT_MAP = {
     "shoulder_pan": "right_arm_shoulder_pan",
     "shoulder_lift": "right_arm_shoulder_lift",
@@ -103,11 +95,75 @@ RIGHT_JOINT_MAP = {
     "gripper": "right_arm_gripper",
 }
 
+SINGLE_ARM_JOINT_MAP = {
+    "shoulder_pan": "arm_shoulder_pan",
+    "shoulder_lift": "arm_shoulder_lift",
+    "elbow_flex": "arm_elbow_flex",
+    "wrist_flex": "arm_wrist_flex",
+    "wrist_roll": "arm_wrist_roll",
+    "gripper": "arm_gripper",
+}
 # Head motor mapping
 HEAD_MOTOR_MAP = {
     "head_motor_1": "head_motor_1",
     "head_motor_2": "head_motor_2",
 }
+
+LEKIWI_BASE_KEYMAP = {
+    "forward": "w",
+    "backward": "s",
+    "left": "a",
+    "right": "d",
+    "rotate_left": "z",
+    "rotate_right": "x",
+    "speed_up": "rqq",
+    "speed_down": "fqq",
+    "quit": "qqq",
+}
+
+XLEROBOT_BASE_KEYMAP = {
+    "forward": "arrowdown",
+    "backward": "arrowup",
+    "left": "arrowright",
+    "right": "arrowleft",
+    "rotate_left": ".",
+    "rotate_right": "/",
+    "speed_up": "rqq",
+    "speed_down": "fqq",
+    "quit": "qqq",
+}
+
+LEKIWI_DATA_ORDER = [
+    'arm_shoulder_pan.pos',
+    'arm_shoulder_lift.pos',
+    'arm_elbow_flex.pos',
+    'arm_wrist_flex.pos',
+    'arm_wrist_roll.pos',
+    'arm_gripper.pos',
+    'x.vel',
+    'y.vel',
+    'theta.vel'
+]
+
+XLEROBOT_DATA_ORDER = [
+    'left_arm_shoulder_pan.pos',
+    'left_arm_shoulder_lift.pos',
+    'left_arm_elbow_flex.pos',
+    'left_arm_wrist_flex.pos',
+    'left_arm_wrist_roll.pos',
+    'left_arm_gripper.pos',
+    'right_arm_shoulder_pan.pos',
+    'right_arm_shoulder_lift.pos',
+    'right_arm_elbow_flex.pos',
+    'right_arm_wrist_flex.pos',
+    'right_arm_wrist_roll.pos',
+    'right_arm_gripper.pos',
+    'head_motor_1.pos',
+    'head_motor_2.pos',
+    'x.vel',
+    'y.vel',
+    'theta.vel'
+]
 
 class RectangularTrajectory:
     """
@@ -221,7 +277,7 @@ class SimpleHeadControl:
         return action
 
 class SimpleTeleopArm:
-    def __init__(self, kinematics, joint_map, initial_obs, prefix="left", kp=0.81):
+    def __init__(self, kinematics, joint_map, initial_obs, prefix="left_", kp=0.81):
         self.kinematics = kinematics
         self.joint_map = joint_map
         self.prefix = prefix  # To distinguish left and right arm
@@ -230,12 +286,12 @@ class SimpleTeleopArm:
         self.gripper_max = 95.0
         # Initial joint positions
         self.joint_positions = {
-            "shoulder_pan": initial_obs[f"{prefix}_arm_shoulder_pan.pos"],
-            "shoulder_lift": initial_obs[f"{prefix}_arm_shoulder_lift.pos"],
-            "elbow_flex": initial_obs[f"{prefix}_arm_elbow_flex.pos"],
-            "wrist_flex": initial_obs[f"{prefix}_arm_wrist_flex.pos"],
-            "wrist_roll": initial_obs[f"{prefix}_arm_wrist_roll.pos"],
-            "gripper": initial_obs[f"{prefix}_arm_gripper.pos"],
+            "shoulder_pan": initial_obs[f"{prefix}arm_shoulder_pan.pos"],
+            "shoulder_lift": initial_obs[f"{prefix}arm_shoulder_lift.pos"],
+            "elbow_flex": initial_obs[f"{prefix}arm_elbow_flex.pos"],
+            "wrist_flex": initial_obs[f"{prefix}arm_wrist_flex.pos"],
+            "wrist_roll": initial_obs[f"{prefix}arm_wrist_roll.pos"],
+            "gripper": initial_obs[f"{prefix}arm_gripper.pos"],
         }
         # Set initial x/y to fixed values
         self.current_x = 0.1629
@@ -282,6 +338,10 @@ class SimpleTeleopArm:
         self.target_positions["wrist_flex"] = 0.0
         
         action = self.p_control_action(robot)
+        # FIXME: lekiwi not handle data without base command
+        action['x.vel'] = 0
+        action['y.vel'] = 0
+        action['theta.vel'] = 0
         robot.send_action(action)
 
     #new11.06
@@ -302,6 +362,10 @@ class SimpleTeleopArm:
         self.target_positions["wrist_flex"] = -joint2 - joint3 + self.pitch
         
         action = self.p_control_action(robot)
+        # FIXME: lekiwi not handle data without base command
+        action['x.vel'] = 0
+        action['y.vel'] = 0
+        action['theta.vel'] = 0
         robot.send_action(action)
     #new11.06
 
@@ -446,14 +510,54 @@ class SimpleTeleopArm:
 
     def p_control_action(self, robot):
         obs = robot.get_observation()
-        current = {j: obs[f"{self.prefix}_arm_{j}.pos"] for j in self.joint_map}
+        current = {j: obs[f"{self.prefix}arm_{j}.pos"] for j in self.joint_map}
         action = {}
         for j in self.target_positions:
             error = self.target_positions[j] - current[j]
             control = self.kp * error
             action[f"{self.joint_map[j]}.pos"] = current[j] + control
         return action
-    
+
+class SimpleBaseControl:
+    def __init__(self, keymap):
+        self.teleop_keys = keymap
+        self.speed_levels = [
+            {"xy": 0.1, "theta": 30},  # slow
+            {"xy": 0.2, "theta": 60},  # medium
+            {"xy": 0.3, "theta": 90},  # fast
+        ]
+        self.speed_index = 0  # Start at slow
+    def _from_keyboard_to_base_action(self, pressed_keys: np.ndarray):
+        # Speed control
+        if self.teleop_keys["speed_up"] in pressed_keys:
+            self.speed_index = min(self.speed_index + 1, 2)
+        if self.teleop_keys["speed_down"] in pressed_keys:
+            self.speed_index = max(self.speed_index - 1, 0)
+        speed_setting = self.speed_levels[self.speed_index]
+        xy_speed = speed_setting["xy"]  # e.g. 0.1, 0.25, or 0.4
+        theta_speed = speed_setting["theta"]  # e.g. 30, 60, or 90
+
+        x_cmd = 0.0  # m/s forward/backward
+        y_cmd = 0.0  # m/s lateral
+        theta_cmd = 0.0  # deg/s rotation
+
+        if self.teleop_keys["forward"] in pressed_keys:
+            x_cmd += xy_speed
+        if self.teleop_keys["backward"] in pressed_keys:
+            x_cmd -= xy_speed
+        if self.teleop_keys["left"] in pressed_keys:
+            y_cmd += xy_speed
+        if self.teleop_keys["right"] in pressed_keys:
+            y_cmd -= xy_speed
+        if self.teleop_keys["rotate_left"] in pressed_keys:
+            theta_cmd += theta_speed
+        if self.teleop_keys["rotate_right"] in pressed_keys:
+            theta_cmd -= theta_speed
+        return {
+            "x.vel": x_cmd,
+            "y.vel": y_cmd,
+            "theta.vel": theta_cmd,
+        }
 
 def main():
     # Teleop parameters
@@ -462,29 +566,31 @@ def main():
     ip = "localhost"  # This is for local/wired connection
     robot_name = "my_xlerobot_pc"
 
+    robot_type = "xlerobot"
+    #robot_type = "lekiwi"
+
     # For zmq connection
     # robot_config = XLerobotClientConfig(remote_ip=ip, id=robot_name)
     # robot = XLerobotClient(robot_config)    
 
     # For local/wired connection
-    robot_config = XLerobotConfig()
-    robot_config.teleop_keys = {
-            # Movement
-            "forward": "arrowdown",
-            "backward": "arrowup",
-            "left": "arrowright",
-            "right": "arrowleft",
-            "rotate_left": ".",
-            "rotate_right": "/",
-            # Speed control
-            "speed_up": "rqq",
-            "speed_down": "fqq",
-            # quit teleop
-            "quit": "qqq",
-        }
+    if robot_type == "lekiwi":
+        # FIXME: different code base
+        from lerobot.common.robots.lekiwi import LeKiwi, LeKiwiConfig
+        from lerobot.common.utils.robot_utils import busy_wait
+        from lerobot.common.model.SO101Robot import SO101Kinematics
+        robot_config = LeKiwiConfig()  
+        robot = LeKiwi(robot_config)
+        all_motors = list(robot.bus.motors.keys())
+    else:
+        from lerobot.robots.xlerobot import XLerobot, XLerobotConfig
+        from lerobot.utils.robot_utils import busy_wait
+        from lerobot.model.SO101Robot import SO101Kinematics
 
-    robot = XLerobot(robot_config)
-    
+        robot_config = XLerobotConfig()
+        robot = XLerobot(robot_config)
+        all_motors = list(robot.bus1.motors.keys()) + list(robot.bus2.motors.keys())
+
     try:
         robot.connect()
         print(f"[MAIN] Successfully connected to robot")
@@ -495,8 +601,11 @@ def main():
         print(robot)
         return
     
+
+    action_thread = threading.Thread(target=zmq_thread, daemon=True)
+    action_thread.start()
+
     #11.11 
-    all_motors = list(robot.bus1.motors.keys()) + list(robot.bus2.motors.keys())
     current_fields = [f"{motor}_current" for motor in all_motors]
     temp_fields = [f"{motor}_temp" for motor in all_motors]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -517,13 +626,11 @@ def main():
     angle_fields = ["timestamp", "obs"]
     angle_csv_path = os.path.join(angle_save_dir, f"angle_data_{timestamp}.csv")
 
-    with open(angle_csv_path, mode='w', newline='') as f:
-        angle_writer = csv.DictWriter(f, fieldnames=angle_fields)
-        angle_writer.writeheader()
-    angle_csv_file = open(angle_csv_path, mode='a', newline='')
-    angle_csv_writer = csv.DictWriter(angle_csv_file, fieldnames=angle_fields)
-    
-
+    #with open(angle_csv_path, mode='w', newline='') as f:
+    #    angle_writer = csv.DictWriter(f, fieldnames=angle_fields)
+    #    angle_writer.writeheader()
+    #angle_csv_file = open(angle_csv_path, mode='a', newline='')
+    #angle_csv_writer = csv.DictWriter(angle_csv_file, fieldnames=angle_fields)
     #11.11
         
     #_init_rerun(session_name="xlerobot_teleop_v2")
@@ -535,16 +642,30 @@ def main():
 
     # Init the arm and head instances
     obs = robot.get_observation()
-    kin_left = SO101Kinematics()
-    kin_right = SO101Kinematics()
-    left_arm = SimpleTeleopArm(kin_left, LEFT_JOINT_MAP, obs, prefix="left")
-    right_arm = SimpleTeleopArm(kin_right, RIGHT_JOINT_MAP, obs, prefix="right")
-    head_control = SimpleHeadControl(obs)
+
+    right_arm = None
+    left_arm = None
+    head_control = None
+
+    # Lekiwi or XLerobot
+    if robot_type == "lekiwi":
+        kin_right = SO101Kinematics()
+        right_arm = SimpleTeleopArm(kin_right, SINGLE_ARM_JOINT_MAP, obs, prefix="")
+        base_control = SimpleBaseControl(LEKIWI_BASE_KEYMAP)
+    else:
+        kin_right = SO101Kinematics()
+        right_arm = SimpleTeleopArm(kin_right, RIGHT_JOINT_MAP, obs, prefix="right_")
+        kin_left = SO101Kinematics()
+        left_arm = SimpleTeleopArm(kin_left, LEFT_JOINT_MAP, obs, prefix="left_")
+        head_control = SimpleHeadControl(obs)
+        base_control = SimpleBaseControl(XLEROBOT_BASE_KEYMAP)
 
     # Move both arms and head to zero position at start
-    left_arm.move_to_fixed_position(robot)
-    right_arm.move_to_fixed_position(robot)
-    
+    if right_arm:
+        right_arm.move_to_zero_position(robot)
+    if left_arm:
+        left_arm.move_to_zero_position(robot)
+
     global action_cmd
 
     #11.11Temperature alarm
@@ -554,14 +675,21 @@ def main():
     cooldown_needed = False
     #11.11Temperature alarm
 
+    # report data to teleop agent
+    context = zmq.Context()
+    socket = context.socket(zmq.PUSH)
+    socket.bind("tcp://*:5559")
+
     try:
         while True:
             #new 10.29
             current_time = time.time()
             if current_time - last_cmd_time > TIMEOUT:
                 #11.06
-                left_arm.move_to_fixed_position(robot)
-                right_arm.move_to_fixed_position(robot)
+                if left_arm:
+                    left_arm.move_to_fixed_position(robot)
+                if right_arm:
+                    right_arm.move_to_fixed_position(robot)
                 #11.06
                 time.sleep(1.0 / FPS)
                 continue
@@ -588,54 +716,65 @@ def main():
             # 11.11Temperature alarm
 
             # Handle rectangular trajectory for left arm (y key)
-            if left_key_state.get('triangle'):
-                print("[MAIN] Left arm rectangular trajectory triggered!")
-                left_arm.execute_rectangular_trajectory(robot, fps=FPS)
-                continue
-
-            # Handle rectangular trajectory for left arm (y key)
-            if left_key_state.get('triangle'):
+            if left_key_state.get('triangle') and left_arm:
                 print("[MAIN] Left arm rectangular trajectory triggered!")
                 left_arm.execute_rectangular_trajectory(robot, fps=FPS)
                 continue
 
             # Handle rectangular trajectory for right arm (Y key)  
-            if right_key_state.get('triangle'):
+            if right_key_state.get('triangle') and right_arm:
                 print("[MAIN] Right arm rectangular trajectory triggered!")
                 right_arm.execute_rectangular_trajectory(robot, fps=FPS)
                 continue
 
             # Handle reset for left arm
-            if left_key_state.get('reset'):
+            if left_key_state.get('reset') and left_arm:
                 left_arm.move_to_zero_position(robot)
                 continue  
 
             # Handle reset for right arm
-            if right_key_state.get('reset'):
+            if right_key_state.get('reset') and right_arm:
                 right_arm.move_to_zero_position(robot)
                 continue
 
             # Handle reset for head motors with '?'
-            if '?' in pressed_keys:
+            if '?' in pressed_keys and head_control:
                 head_control.move_to_zero_position(robot)
                 continue
 
-            left_arm.handle_keys(left_key_state)
-            right_arm.handle_keys(right_key_state)
-            head_control.handle_keys(left_key_state)  # Head controlled by left arm keymap
+            left_action = {}
+            right_action = {}
+            head_action = {}
 
-            left_action = left_arm.p_control_action(robot)
-            right_action = right_arm.p_control_action(robot)
-            head_action = head_control.p_control_action(robot)
+            if left_arm:
+                left_arm.handle_keys(left_key_state)
+                left_action = left_arm.p_control_action(robot)
+            if right_arm:
+                right_arm.handle_keys(right_key_state)
+                right_action = right_arm.p_control_action(robot)
+            if head_control:
+                head_control.handle_keys(left_key_state)  # Head controlled by left arm keymap
+                head_action = head_control.p_control_action(robot)
 
             # Base action
             keyboard_keys = np.array(list(pressed_keys))
-            base_action = robot._from_keyboard_to_base_action(keyboard_keys) or {}
+            base_action = base_control._from_keyboard_to_base_action(keyboard_keys) or {}
 
             action = {**left_action, **right_action, **head_action, **base_action}
             robot.send_action(action)
 
             obs = robot.get_observation()
+
+            if robot_type == "lekiwi":
+                report = {'obs': [float(obs[k]) for k in LEKIWI_DATA_ORDER],
+                    'act': [float(action[k]) for k in LEKIWI_DATA_ORDER]}
+            else:
+                report = {'obs': [float(obs[k]) for k in XLEROBOT_DATA_ORDER],
+                    'act': [float(action[k]) for k in XLEROBOT_DATA_ORDER]}
+
+            # report
+            socket.send_string(json.dumps(report))
+
             angle_values = []
             act_values = []
             for motor in all_motors:
@@ -647,18 +786,24 @@ def main():
             current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S.%f")
             angle_row = {
                 "timestamp": current_time_str,
-                "obs": json.dumps({"obs": angle_values, "act": act_values})  # 新增act字段
+                "obs": json.dumps({"obs": angle_values, "act": act_values})
             }
-            angle_csv_writer.writerow(angle_row)
+            #angle_csv_writer.writerow(angle_row)
 
-            #11.11
-            current_bus1 = robot.bus1.sync_read("Present_Current")
-            current_bus2 = robot.bus2.sync_read("Present_Current")
-            all_current = {**current_bus1, **current_bus2}
+            if robot_type == "lekiwi":
+                current_bus = robot.bus.sync_read("Present_Current")
+                all_current = {**current_bus}
 
-            temp_bus1 = robot.bus1.sync_read("Present_Temperature")
-            temp_bus2 = robot.bus2.sync_read("Present_Temperature")
-            all_temp = {**temp_bus1, **temp_bus2}
+                temp_bus = robot.bus.sync_read("Present_Temperature")
+                all_temp = {**temp_bus}
+            else:
+                current_bus1 = robot.bus1.sync_read("Present_Current")
+                current_bus2 = robot.bus2.sync_read("Present_Current")
+                all_current = {**current_bus1, **current_bus2}
+
+                temp_bus1 = robot.bus1.sync_read("Present_Temperature")
+                temp_bus2 = robot.bus2.sync_read("Present_Temperature")
+                all_temp = {**temp_bus1, **temp_bus2}
             
             current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
@@ -686,47 +831,60 @@ def main():
                 if consecutive_over_temp >= 3:
                     print(f"[ALERT] Three consecutive times the temperature exceeds{temp_threshold}°C,The robotic arm stops.")
 
-                    robot.bus1.disable_torque()
-                    robot.bus2.disable_torque()
+                    if robot_type == "lekiwi":
+                        robot.bus.disable_torque()
+                        time.sleep(10)
+                        robot.bus.enable_torque()
+                        time.sleep(5)
+                        right_arm.move_to_zero_position(robot)
+                        time.sleep(10)
+                        right_arm.move_to_fixed_position(robot)
+                        print(f"[ALERT] The robotic arm resets and pauses for 10 seconds.")
+                        cooldown_needed = True
 
-                    time.sleep(10)
-                    robot.bus1.enable_torque()
-                    robot.bus2.enable_torque()
-                    time.sleep(5)
-                    left_arm.move_to_zero_position(robot)
-                    right_arm.move_to_zero_position(robot)
-                    
-                    time.sleep(10)
-                    left_arm.move_to_fixed_position(robot)
-                    right_arm.move_to_fixed_position(robot)
-                    head_control.move_to_zero_position(robot)
-                
-                    print(f"[ALERT] The robotic arm resets and pauses for 10 seconds.")
-                    
-                    
-                    cooldown_needed = True
+                    else:
+                        robot.bus1.disable_torque()
+                        robot.bus2.disable_torque()
+                        time.sleep(10)
+                        robot.bus1.enable_torque()
+                        robot.bus2.enable_torque()
+                        time.sleep(5)
+                        left_arm.move_to_zero_position(robot)
+                        right_arm.move_to_zero_position(robot)
+                        time.sleep(10)
+                        left_arm.move_to_fixed_position(robot)
+                        right_arm.move_to_fixed_position(robot)
+                        head_control.move_to_zero_position(robot)
+                        print(f"[ALERT] The robotic arm resets and pauses for 10 seconds.")
+                        cooldown_needed = True
             else:
 
                 consecutive_over_temp = 0
 
 
-            obs = robot.get_observation()
-            head1_angle = obs.get("head_motor_1.pos", 0.0)
-            head2_angle = obs.get("head_motor_2.pos", 0.0)
-            left_gripper_angle = obs.get("left_arm_gripper.pos", 0.0)
-            right_gripper_angle = obs.get("right_arm_gripper.pos", 0.0)
-            print(f"head1: {head1_angle:.2f}°head2: {head2_angle:.2f}°")
-            print(f"left_angle: {left_gripper_angle:.2f}°right_angl: {right_gripper_angle:.2f}")
+            if robot_type == "lekiwi":
+                pass
+            else:
+                obs = robot.get_observation()
+                head1_angle = obs.get("head_motor_1.pos", 0.0)
+                head2_angle = obs.get("head_motor_2.pos", 0.0)
+                left_gripper_angle = obs.get("left_arm_gripper.pos", 0.0)
+                right_gripper_angle = obs.get("right_arm_gripper.pos", 0.0)
+                print(f"head1: {head1_angle:.2f}°head2: {head2_angle:.2f}°")
+                print(f"left_angle: {left_gripper_angle:.2f}°right_angl: {right_gripper_angle:.2f}")
             # print(f"[MAIN] Observation: {obs}")
             #log_rerun_data(obs, action)
-            # busy_wait(1.0 / FPS)
+            busy_wait(1.0 / FPS)
     finally:
         #11.11
         csv_file.close()
         #11.11
-        angle_csv_file.close()
+        #angle_csv_file.close()
         robot.disconnect()
         #keyboard.disconnect()
+        global is_running
+        is_running = False
+        action_thread.join()
         print("Teleoperation ended.")
 
 if __name__ == "__main__":
