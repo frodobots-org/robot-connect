@@ -12,6 +12,7 @@ import time
 import numpy as np
 import math
 import threading
+from abc import ABC, abstractmethod
 #11.11
 import csv
 from datetime import datetime
@@ -33,6 +34,151 @@ TIMEOUT = 0.9
 #new10.29
 is_running = True
 
+ROBOT_TYPE = "lekiwi"
+
+class TelearmsRobot(ABC):
+    type: str
+    x_speed: float = 0.0
+    y_speed: float = 0.0
+    theta_speed: float = 0.0
+
+    def get_speed_setting(self):
+        return {"x": self.x_speed, "y": self.y_speed, "theta": self.theta_speed}
+
+    @abstractmethod
+    def get_gamepad_action(self, data):
+        pass
+
+    @abstractmethod
+    def get_keyboard_action(self, data):
+        pass
+
+class TelearmsXlerobot(ABC):
+    type = "xlerobot"
+
+    def get_gamepad_action(self, data):
+        pass
+
+    def get_keyboard_action(self, data):
+        pass
+
+
+class TelearmsLekiwi(TelearmsRobot):
+    type = "lekiwi"
+    def get_keyboard_action(self, data):
+        action = {}
+        self.x_speed = 0.1
+        self.y_speed = 0.1
+        self.theta_speed = 30
+        try:
+            for key, value in data.items():
+                if not (isinstance(value, bool) and value is False):
+                    action[key] = value
+        except:
+            pass
+        return action
+
+    def get_gamepad_action(self, data):
+        action = {}
+        try:
+            mode = 0
+            # 0: base control
+            # 1: arm translation
+            # 2: arm rotation
+
+            # q
+            if data["buttons"][7] > 0 and data["buttons"][2] > 0:
+                action["q"] = True
+
+            # mode
+            if data["buttons"][5] > 0 and data["buttons"][7] > 0:
+                mode = 2
+            elif data["buttons"][5] > 0:
+                mode = 1
+
+            # ----------------------
+            # mode 0: base control
+            # ----------------------
+            if mode == 0:
+                if data["axes"][1] > 0.1:
+                    action["s"] = True
+                if data["axes"][1] < -0.1:
+                    action["w"] = True
+                self.x_speed = abs(data["axes"][1]) * 0.6
+
+                if data["axes"][0] > 0.1:
+                    action["d"] = True
+                if data["axes"][0] < -0.1:
+                    action["a"] = True
+                self.y_speed = abs(data["axes"][0]) * 0.6
+
+                if data["axes"][2] > 0.1:
+                    action["x"] = True
+                if data["axes"][2] < -0.1:
+                    action["z"] = True
+                self.theta_speed = 100 * abs(data["axes"][2]) / 2
+
+            # ----------------------
+            # mode 1: arm translation
+            # ----------------------
+            elif mode == 1:
+                if data["axes"][3] > 0.8:
+                    action["j"] = True
+                elif data["axes"][3] < -0.8:
+                    action["u"] = True
+                elif data["axes"][2] > 0.8:
+                    action["k"] = True
+                elif data["axes"][2] < -0.8:
+                    action["h"] = True
+
+                # axis z
+                if data["buttons"][3] > 0:
+                    action["y"] = True
+
+                if data["buttons"][0] > 0:
+                    action["i"] = True
+
+            # ----------------------
+            # mode 2: arm rotation
+            # ----------------------
+            elif mode == 2:
+                if data["axes"][3] > 0.8:
+                   action["g"] = True
+                elif data["axes"][3] < -0.8:
+                    action["t"] = True
+                elif data["axes"][2] > 0.8:
+                    action["r"] = True
+                elif data["axes"][2] < -0.8:
+                    action["f"] = True
+
+            # ----------------------
+            # Gripper control
+            # ----------------------
+            if data["buttons"][1] > 0:
+                action["n"] = True
+
+            if data["buttons"][2] > 0:
+                action["b"] = True
+        except:
+            pass
+        return action
+
+
+if ROBOT_TYPE == "lekiwi":
+    telearms_robot = TelearmsLekiwi()
+else:
+    telearms_robot = TelearmsXlerobot()
+
+def get_action_cmd(msg):
+    global telearms_robot
+    action_cmd = {}
+    if msg["type"] == "gamepad":
+        action_cmd = telearms_robot.get_gamepad_action(msg["data"])
+    elif msg["type"] == "keyboard":
+        action_cmd = telearms_robot.get_keyboard_action(msg["data"])
+
+    return action_cmd
+
 def zmq_thread():
     zmq_context = zmq.Context()
     zmq_cmd_socket = zmq_context.socket(zmq.PULL)
@@ -42,8 +188,7 @@ def zmq_thread():
     while is_running:
         try:
             msg = zmq_cmd_socket.recv_string()
-            print(msg)
-            action_cmd = dict(json.loads(msg))
+            action_cmd = get_action_cmd(dict(json.loads(msg)))
             last_cmd_time = time.time() #new10.29
         except zmq.Again:
             #action_cmd = {}
@@ -522,37 +667,32 @@ class SimpleBaseControl:
     def __init__(self, keymap):
         self.teleop_keys = keymap
         self.speed_levels = [
-            {"xy": 0.1, "theta": 30},  # slow
+            {"xy": 0.8, "theta": 90},  # slow
             {"xy": 0.2, "theta": 60},  # medium
             {"xy": 0.3, "theta": 90},  # fast
         ]
         self.speed_index = 0  # Start at slow
-    def _from_keyboard_to_base_action(self, pressed_keys: np.ndarray):
-        # Speed control
-        if self.teleop_keys["speed_up"] in pressed_keys:
-            self.speed_index = min(self.speed_index + 1, 2)
-        if self.teleop_keys["speed_down"] in pressed_keys:
-            self.speed_index = max(self.speed_index - 1, 0)
-        speed_setting = self.speed_levels[self.speed_index]
-        xy_speed = speed_setting["xy"]  # e.g. 0.1, 0.25, or 0.4
-        theta_speed = speed_setting["theta"]  # e.g. 30, 60, or 90
+    def _from_keyboard_to_base_action(self, pressed_keys: np.ndarray, speed_setting): 
+        x_speed = speed_setting["x"]
+        y_speed = speed_setting["y"]
+        theta_speed = speed_setting["theta"]
 
         x_cmd = 0.0  # m/s forward/backward
         y_cmd = 0.0  # m/s lateral
         theta_cmd = 0.0  # deg/s rotation
 
         if self.teleop_keys["forward"] in pressed_keys:
-            x_cmd += xy_speed
+            x_cmd = x_speed
         if self.teleop_keys["backward"] in pressed_keys:
-            x_cmd -= xy_speed
+            x_cmd = -x_speed
         if self.teleop_keys["left"] in pressed_keys:
-            y_cmd += xy_speed
+            y_cmd = y_speed
         if self.teleop_keys["right"] in pressed_keys:
-            y_cmd -= xy_speed
+            y_cmd = -y_speed
         if self.teleop_keys["rotate_left"] in pressed_keys:
-            theta_cmd += theta_speed
+            theta_cmd = theta_speed
         if self.teleop_keys["rotate_right"] in pressed_keys:
-            theta_cmd -= theta_speed
+            theta_cmd = -theta_speed
         return {
             "x.vel": x_cmd,
             "y.vel": y_cmd,
@@ -566,8 +706,8 @@ def main():
     ip = "localhost"  # This is for local/wired connection
     robot_name = "my_xlerobot_pc"
 
-    robot_type = "xlerobot"
-    #robot_type = "lekiwi"
+    #robot_type = "xlerobot"
+    robot_type = "lekiwi"
 
     # For zmq connection
     # robot_config = XLerobotClientConfig(remote_ip=ip, id=robot_name)
@@ -576,9 +716,9 @@ def main():
     # For local/wired connection
     if robot_type == "lekiwi":
         # FIXME: different code base
-        from lerobot.common.robots.lekiwi import LeKiwi, LeKiwiConfig
-        from lerobot.common.utils.robot_utils import busy_wait
-        from lerobot.common.model.SO101Robot import SO101Kinematics
+        from lerobot.robots.lekiwi import LeKiwi, LeKiwiConfig
+        from lerobot.utils.robot_utils import busy_wait
+        from lerobot.model.SO101Robot import SO101Kinematics
         robot_config = LeKiwiConfig()  
         robot = LeKiwi(robot_config)
         all_motors = list(robot.bus.motors.keys())
@@ -758,7 +898,8 @@ def main():
 
             # Base action
             keyboard_keys = np.array(list(pressed_keys))
-            base_action = base_control._from_keyboard_to_base_action(keyboard_keys) or {}
+            global telearms_robot
+            base_action = base_control._from_keyboard_to_base_action(keyboard_keys, telearms_robot.get_speed_setting()) or {}
 
             action = {**left_action, **right_action, **head_action, **base_action}
             robot.send_action(action)
@@ -806,12 +947,12 @@ def main():
                 all_temp = {**temp_bus1, **temp_bus2}
             
             current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
+            '''
             print(f"\n[{current_time_str}] motor current and temperature:")
             for motor in all_motors:
                 print(f"  {motor}: current={all_current.get(motor, 0)}mA, temp={all_temp.get(motor, 0)}°C", end="; ")
             print()
-            
+            '''
             csv_row = {"timestamp": current_time_str}
             for motor in all_motors:
                 csv_row[f"{motor}_current"] = all_current.get(motor, 0)

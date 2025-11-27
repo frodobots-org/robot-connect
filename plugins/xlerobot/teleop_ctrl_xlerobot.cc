@@ -234,31 +234,14 @@ void TeleopCtrlXLerobot::ProcessGamepadAction(const json& action,
 }
 
 void TeleopCtrlXLerobot::OnMessageReceived(const char* data) {
-  if (data != nullptr) 
-  {
-    std::cout << "接收到的外部输入数据：" << data << std::endl;
-  }
-  size_t len = std::strlen(data);
+  //if (data != nullptr) 
+  //{
+  //  std::cout << "接收到的外部输入数据：" << data << std::endl;
+  //}
   if (is_running_) {
-
-    {
-      std::lock_guard<std::mutex> lock(lock_); 
-      if (!action_.contains("arm_gripper.pos")) {
-        action_ = report_;
-      }
-    }
-    std::string action_string;
-    json action = json::parse(data);
-    if (action.contains("type") && action["type"] == "keyboard") {
-      ProcessKeyboardAction(action, action_string);
-    } else if (action.contains("type") && action["type"] == "gamepad") {
-      ProcessGamepadAction(action, action_string);
-    } else {
-      action_string = std::string(data);
-    }
-
-    if (action_string.length() > 0) {
-      zmq::message_t message(action_string.c_str(), action_string.length());
+    if (data) {
+      size_t len = std::strlen(data);
+      zmq::message_t message(data, len);
       socket_action_.send(message, zmq::send_flags::none);
     }
   }
