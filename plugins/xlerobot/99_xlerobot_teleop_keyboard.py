@@ -34,6 +34,7 @@ TIMEOUT = 0.9
 #new10.29
 is_running = True
 
+#ROBOT_TYPE = "xlerobot"
 ROBOT_TYPE = "lekiwi"
 
 class TelearmsRobot(ABC):
@@ -45,27 +46,13 @@ class TelearmsRobot(ABC):
     def get_speed_setting(self):
         return {"x": self.x_speed, "y": self.y_speed, "theta": self.theta_speed}
 
-    @abstractmethod
-    def get_gamepad_action(self, data):
-        pass
+    def get_axis_value(self, axes, index):
+        return axes[index] if index < len(axes) else 0
 
-    @abstractmethod
-    def get_keyboard_action(self, data):
-        pass
+    def get_button_value(self, buttons, index):
+        return buttons[index] if index < len(buttons) else 0
 
-class TelearmsXlerobot(ABC):
-    type = "xlerobot"
-
-    def get_gamepad_action(self, data):
-        pass
-
-    def get_keyboard_action(self, data):
-        pass
-
-
-class TelearmsLekiwi(TelearmsRobot):
-    type = "lekiwi"
-    def get_keyboard_action(self, data):
+    def handle_keyboard_action(self, data):
         action = {}
         self.x_speed = 0.1
         self.y_speed = 0.1
@@ -78,91 +65,224 @@ class TelearmsLekiwi(TelearmsRobot):
             pass
         return action
 
-    def get_gamepad_action(self, data):
+    @abstractmethod
+    def handle_gamepad_action(self, data):
+        pass
+
+class TelearmsXlerobot(ABC):
+    type = "xlerobot"
+
+    def handle_gamepad_action(self, data):
         action = {}
-        try:
-            mode = 0
-            # 0: base control
-            # 1: arm translation
-            # 2: arm rotation
 
-            # q
-            if data["buttons"][7] > 0 and data["buttons"][2] > 0:
+        # helpers
+        btn = lambda i: self.get_button_value(data["buttons"], i)
+        axis = lambda i: self.get_axis_value(data["axes"], i)
+
+        right_mode = 0
+        left_mode = 0
+
+        # --- RIGHT HAND ---
+
+        # combo p
+        if btn(7) > 0 and btn(2) > 0:
+            action["p"] = True
+
+        # mode detect
+        if btn(5) > 0 and btn(7) > 0:
+            right_mode = 2
+        elif btn(5) > 0:
+            right_mode = 1
+        elif btn(7) > 0:
+            right_mode = 3
+
+        # mode 0: base control
+        if right_mode == 0:
+            if axis(2) > 0.75:
+                action["/"] = True
+            if axis(2) < -0.75:
+                action["."] = True
+
+            self.theta_speed = 100 * abs(axis(2)) / 2
+
+        # mode 1: arm translation
+        elif right_mode == 1:
+            if axis(3) > 0.8:
+                action["j"] = True
+            elif axis(3) < -0.8:
+                action["u"] = True
+            elif axis(2) > 0.8:
+                action["k"] = True
+            elif axis(2) < -0.8:
+                action["h"] = True
+
+            if btn(3) > 0:
+                action["y"] = True
+            if btn(0) > 0:
+                action["i"] = True
+
+        # mode 2: arm rotation
+        elif right_mode == 2:
+            if axis(3) > 0.8:
+                action["g"] = True
+            elif axis(3) < -0.8:
+                action["t"] = True
+            elif axis(2) > 0.8:
+                action["6"] = True
+            elif axis(2) < -0.8:
+                action["5"] = True
+
+        # mode 3: head control
+        elif right_mode == 3:
+            if axis(3) > 0.8:
+                action["9"] = True
+            elif axis(3) < -0.8:
+                action["0"] = True
+            elif axis(2) > 0.8:
+                action["8"] = True
+            elif axis(2) < -0.8:
+                action["7"] = True
+
+        # right gripper
+        if btn(1) > 0:
+            action["n"] = True
+        if btn(2) > 0:
+            action["b"] = True
+
+        # --- LEFT HAND ---
+
+        # combo c
+        if btn(6) > 0 and btn(15) > 0:
+            action["c"] = True
+
+        # mode detect
+        if btn(4) > 0 and btn(6) > 0:
+            left_mode = 2
+        elif btn(4) > 0:
+            left_mode = 1
+
+        # mode 0: base control
+        if left_mode == 0:
+            if axis(1) > 0.1:
+                action["arrowdown"] = True
+            if axis(1) < -0.1:
+                action["arrowup"] = True
+            self.x_speed = abs(axis(1)) * 0.6
+
+            if axis(0) > 0.1:
+                action["arrowright"] = True
+            if axis(0) < -0.1:
+                action["arrowleft"] = True
+            self.y_speed = abs(axis(0)) * 0.6
+
+        # mode 1: arm translation
+        elif left_mode == 1:
+            if axis(1) > 0.8:
+                action["s"] = True
+            elif axis(1) < -0.8:
+                action["w"] = True
+            elif axis(0) > 0.8:
+                action["d"] = True
+            elif axis(0) < -0.8:
+                action["a"] = True
+
+            if btn(12) > 0:
                 action["q"] = True
+            if btn(13) > 0:
+                action["e"] = True
 
-            # mode
-            if data["buttons"][5] > 0 and data["buttons"][7] > 0:
-                mode = 2
-            elif data["buttons"][5] > 0:
-                mode = 1
+        # mode 2: arm rotation
+        elif left_mode == 2:
+            if axis(1) > 0.8:
+                action["f"] = True
+            elif axis(1) < -0.8:
+                action["r"] = True
+            elif axis(0) > 0.8:
+                action["2"] = True
+            elif axis(0) < -0.8:
+                action["1"] = True
 
-            # ----------------------
-            # mode 0: base control
-            # ----------------------
-            if mode == 0:
-                if data["axes"][1] > 0.1:
-                    action["s"] = True
-                if data["axes"][1] < -0.1:
-                    action["w"] = True
-                self.x_speed = abs(data["axes"][1]) * 0.6
+        # left gripper
+        if btn(15) > 0:
+            action["x"] = True
+        if btn(14) > 0:
+            action["z"] = True
 
-                if data["axes"][0] > 0.1:
-                    action["d"] = True
-                if data["axes"][0] < -0.1:
-                    action["a"] = True
-                self.y_speed = abs(data["axes"][0]) * 0.6
-
-                if data["axes"][2] > 0.1:
-                    action["x"] = True
-                if data["axes"][2] < -0.1:
-                    action["z"] = True
-                self.theta_speed = 100 * abs(data["axes"][2]) / 2
-
-            # ----------------------
-            # mode 1: arm translation
-            # ----------------------
-            elif mode == 1:
-                if data["axes"][3] > 0.8:
-                    action["j"] = True
-                elif data["axes"][3] < -0.8:
-                    action["u"] = True
-                elif data["axes"][2] > 0.8:
-                    action["k"] = True
-                elif data["axes"][2] < -0.8:
-                    action["h"] = True
-
-                # axis z
-                if data["buttons"][3] > 0:
-                    action["y"] = True
-
-                if data["buttons"][0] > 0:
-                    action["i"] = True
-
-            # ----------------------
-            # mode 2: arm rotation
-            # ----------------------
-            elif mode == 2:
-                if data["axes"][3] > 0.8:
-                   action["g"] = True
-                elif data["axes"][3] < -0.8:
-                    action["t"] = True
-                elif data["axes"][2] > 0.8:
-                    action["r"] = True
-                elif data["axes"][2] < -0.8:
-                    action["f"] = True
-
-            # ----------------------
-            # Gripper control
-            # ----------------------
-            if data["buttons"][1] > 0:
-                action["n"] = True
-
-            if data["buttons"][2] > 0:
-                action["b"] = True
-        except:
-            pass
         return action
 
+class TelearmsLekiwi(TelearmsRobot):
+    type = "lekiwi"
+
+    def handle_gamepad_action(self, data):
+        action = {}
+        btn = lambda i: self.get_button_value(data["buttons"], i)
+        axis = lambda i: self.get_axis_value(data["axes"], i)
+
+        mode = 0
+
+        # q
+        if btn(7) > 0 and btn(2) > 0:
+            action["q"] = True
+
+        # mode switch
+        if btn(5) > 0 and btn(7) > 0:
+            mode = 2
+        elif btn(5) > 0:
+            mode = 1
+
+        # mode 0: base control
+        if mode == 0:
+            if axis(1) > 0.1:
+                action["s"] = True
+            if axis(1) < -0.1:
+                action["w"] = True
+            self.x_speed = abs(axis(1)) * 0.6
+
+            if axis(0) > 0.1:
+                action["d"] = True
+            if axis(0) < -0.1:
+                action["a"] = True
+            self.y_speed = abs(axis(0)) * 0.6
+
+            if axis(2) > 0.1:
+                action["x"] = True
+            if axis(2) < -0.1:
+                action["z"] = True
+            self.theta_speed = 100 * abs(axis(2)) / 2
+
+        # mode 1: arm translation
+        elif mode == 1:
+            if axis(3) > 0.8:
+                action["j"] = True
+            elif axis(3) < -0.8:
+                action["u"] = True
+            elif axis(2) > 0.8:
+                action["k"] = True
+            elif axis(2) < -0.8:
+                action["h"] = True
+
+            if btn(3) > 0:
+                action["y"] = True
+            if btn(0) > 0:
+                action["i"] = True
+
+        # mode 2: arm rotation
+        elif mode == 2:
+            if axis(3) > 0.8:
+                action["g"] = True
+            elif axis(3) < -0.8:
+                action["t"] = True
+            elif axis(2) > 0.8:
+                action["r"] = True
+            elif axis(2) < -0.8:
+                action["f"] = True
+
+        # gripper
+        if btn(1) > 0:
+            action["n"] = True
+        if btn(2) > 0:
+            action["b"] = True
+        return action
 
 if ROBOT_TYPE == "lekiwi":
     telearms_robot = TelearmsLekiwi()
@@ -173,9 +293,9 @@ def get_action_cmd(msg):
     global telearms_robot
     action_cmd = {}
     if msg["type"] == "gamepad":
-        action_cmd = telearms_robot.get_gamepad_action(msg["data"])
+        action_cmd = telearms_robot.handle_gamepad_action(msg["data"])
     elif msg["type"] == "keyboard":
-        action_cmd = telearms_robot.get_keyboard_action(msg["data"])
+        action_cmd = telearms_robot.handle_keyboard_action(msg["data"])
 
     return action_cmd
 
@@ -706,15 +826,12 @@ def main():
     ip = "localhost"  # This is for local/wired connection
     robot_name = "my_xlerobot_pc"
 
-    #robot_type = "xlerobot"
-    robot_type = "lekiwi"
-
     # For zmq connection
     # robot_config = XLerobotClientConfig(remote_ip=ip, id=robot_name)
     # robot = XLerobotClient(robot_config)    
 
     # For local/wired connection
-    if robot_type == "lekiwi":
+    if ROBOT_TYPE == "lekiwi":
         # FIXME: different code base
         from lerobot.robots.lekiwi import LeKiwi, LeKiwiConfig
         from lerobot.utils.robot_utils import busy_wait
@@ -788,7 +905,7 @@ def main():
     head_control = None
 
     # Lekiwi or XLerobot
-    if robot_type == "lekiwi":
+    if ROBOT_TYPE == "lekiwi":
         kin_right = SO101Kinematics()
         right_arm = SimpleTeleopArm(kin_right, SINGLE_ARM_JOINT_MAP, obs, prefix="")
         base_control = SimpleBaseControl(LEKIWI_BASE_KEYMAP)
@@ -906,7 +1023,7 @@ def main():
 
             obs = robot.get_observation()
 
-            if robot_type == "lekiwi":
+            if ROBOT_TYPE == "lekiwi":
                 report = {'obs': [float(obs[k]) for k in LEKIWI_DATA_ORDER],
                     'act': [float(action[k]) for k in LEKIWI_DATA_ORDER]}
             else:
@@ -931,7 +1048,7 @@ def main():
             }
             #angle_csv_writer.writerow(angle_row)
 
-            if robot_type == "lekiwi":
+            if ROBOT_TYPE == "lekiwi":
                 current_bus = robot.bus.sync_read("Present_Current")
                 all_current = {**current_bus}
 
@@ -972,7 +1089,7 @@ def main():
                 if consecutive_over_temp >= 3:
                     print(f"[ALERT] Three consecutive times the temperature exceeds{temp_threshold}°C,The robotic arm stops.")
 
-                    if robot_type == "lekiwi":
+                    if ROBOT_TYPE == "lekiwi":
                         robot.bus.disable_torque()
                         time.sleep(10)
                         robot.bus.enable_torque()
@@ -1003,7 +1120,7 @@ def main():
                 consecutive_over_temp = 0
 
 
-            if robot_type == "lekiwi":
+            if ROBOT_TYPE == "lekiwi":
                 pass
             else:
                 obs = robot.get_observation()
