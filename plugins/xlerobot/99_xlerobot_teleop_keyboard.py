@@ -220,9 +220,9 @@ class TelearmsLekiwi(TelearmsRobot):
 
         mode = 0
 
-        # q
+        # p
         if btn(7) > 0 and btn(2) > 0:
-            action["q"] = True
+            action["p"] = True
 
         # mode switch
         if btn(5) > 0 and btn(7) > 0:
