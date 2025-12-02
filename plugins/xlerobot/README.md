@@ -32,17 +32,6 @@ cp -r frodobots /opt
 
 ### Build plugin for xlerobot
 cd teleop-device-sdk/plugins/xlerobot
-```diff
-#Modify a teleop_ctrl_xlerobot.cc file
---- a/teleop-device-sdk/plugins/xlerobot/teleop_ctrl_xlerobot.cc
-+++ b/teleop-device-sdk/plugins/xlerobot/teleop_ctrl_xlerobot.cc
-@@ -279,7 +279,7 @@ void TeleopCtrlXLerobot::Invoke() {
-  socket_action_.connect("tcp://<your ip>:5558"); #Change to the local Raspberry Pi's IP address
-  socket_observation_.connect("tcp://<your ip>:5556");
-  is_running_ = true;
-  printf("Connected\n");
-  pull_thread_ = std::thread(&TeleopCtrlXLerobot::PullThread, this);
-```
 ```
 mkdir build
 cd build
@@ -63,7 +52,7 @@ Modify a teleop ini file
 token =<your token> 
 video = 3
 audio = 0
-project = lekiwi
+project = telearms
 record = false
 
 [signal]
