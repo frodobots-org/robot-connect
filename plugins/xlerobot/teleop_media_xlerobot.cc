@@ -192,7 +192,7 @@ void TeleopMediaGst::Invoke() {
     pipeline1_ = gst_parse_launch(pipeline1.c_str(), NULL);
     appsink1_ = gst_bin_get_by_name(GST_BIN(pipeline1_), "sink");
     identity1_ = gst_bin_get_by_name(GST_BIN(pipeline1_), "id");
-    //g_signal_connect(identity1_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
+    g_signal_connect(identity1_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
     g_signal_connect(appsink1_, "new-sample", G_CALLBACK(OnVideoSampleWristRight), this);
     g_object_set(appsink1_, "emit-signals", TRUE, NULL);
   }
@@ -204,7 +204,7 @@ void TeleopMediaGst::Invoke() {
     pipeline2_ = gst_parse_launch(pipeline2.c_str(), NULL);
     appsink2_ = gst_bin_get_by_name(GST_BIN(pipeline2_), "sink");
     identity2_ = gst_bin_get_by_name(GST_BIN(pipeline2_), "id");
-    //g_signal_connect(identity2_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
+    g_signal_connect(identity2_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
     g_signal_connect(appsink2_, "new-sample", G_CALLBACK(OnVideoSampleWristLeft), this);
     g_object_set(appsink2_, "emit-signals", TRUE, NULL);
   }
@@ -215,7 +215,7 @@ void TeleopMediaGst::Invoke() {
     pipeline3_ = gst_parse_launch(pipeline3.c_str(), NULL);
     appsink3_ = gst_bin_get_by_name(GST_BIN(pipeline3_), "sink");
     identity3_ = gst_bin_get_by_name(GST_BIN(pipeline3_), "id");
-    //g_signal_connect(identity3_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
+    g_signal_connect(identity3_, "handoff", G_CALLBACK(on_buffer_handoff), NULL);
     g_signal_connect(appsink3_, "new-sample", G_CALLBACK(OnVideoSampleMajor), this);
     g_object_set(appsink3_, "emit-signals", TRUE, NULL);
   }
