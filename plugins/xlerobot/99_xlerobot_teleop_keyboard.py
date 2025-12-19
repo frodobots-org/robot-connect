@@ -30,12 +30,12 @@ FIXED_PITCH = 0
 #new 11.06
 #new10.29
 last_cmd_time = time.time()
-TIMEOUT = 0.9
+TIMEOUT = 1
 #new10.29
 is_running = True
 
-#ROBOT_TYPE = "xlerobot"
-ROBOT_TYPE = "lekiwi"
+ROBOT_TYPE = "xlerobot"
+#ROBOT_TYPE = "lekiwi"
 
 class TelearmsRobot(ABC):
     type: str
@@ -69,7 +69,7 @@ class TelearmsRobot(ABC):
     def handle_gamepad_action(self, data):
         pass
 
-class TelearmsXlerobot(ABC):
+class TelearmsXlerobot(TelearmsRobot):
     type = "xlerobot"
 
     def handle_gamepad_action(self, data):
@@ -103,7 +103,7 @@ class TelearmsXlerobot(ABC):
             if axis(2) < -0.75:
                 action["."] = True
 
-            self.theta_speed = 100 * abs(axis(2)) / 2
+            self.theta_speed = 80 * abs(axis(2)) / 2
 
         # mode 1: arm translation
         elif right_mode == 1:
@@ -167,13 +167,13 @@ class TelearmsXlerobot(ABC):
                 action["arrowdown"] = True
             if axis(1) < -0.1:
                 action["arrowup"] = True
-            self.x_speed = abs(axis(1)) * 0.6
+            self.x_speed = abs(axis(1)) * 0.4
 
             if axis(0) > 0.1:
                 action["arrowright"] = True
             if axis(0) < -0.1:
                 action["arrowleft"] = True
-            self.y_speed = abs(axis(0)) * 0.6
+            self.y_speed = abs(axis(0)) * 0.4
 
         # mode 1: arm translation
         elif left_mode == 1:
@@ -220,9 +220,9 @@ class TelearmsLekiwi(TelearmsRobot):
 
         mode = 0
 
-        # p
+        # q
         if btn(7) > 0 and btn(2) > 0:
-            action["p"] = True
+            action["q"] = True
 
         # mode switch
         if btn(5) > 0 and btn(7) > 0:
@@ -248,7 +248,7 @@ class TelearmsLekiwi(TelearmsRobot):
                 action["x"] = True
             if axis(2) < -0.1:
                 action["z"] = True
-            self.theta_speed = 100 * abs(axis(2)) / 2
+            self.theta_speed = 80 * abs(axis(2)) / 2
 
         # mode 1: arm translation
         elif mode == 1:
@@ -932,6 +932,11 @@ def main():
     cooldown_needed = False
     #11.11Temperature alarm
 
+    #Electric Current Warning
+    current_high_threshold = 400
+    current_medium_threshold = 200 
+    consecutive_over_current = 0 
+
     # report data to teleop agent
     context = zmq.Context()
     socket = context.socket(zmq.PUSH)
@@ -1078,6 +1083,50 @@ def main():
 
             csv_writer.writerow(csv_row)
             #11.11
+
+            #Electric Current Warning
+
+            any_over_high_current = any(current > current_high_threshold for current in all_current.values())
+            any_over_medium_current = any(current > current_medium_threshold for current in all_current.values())
+
+            if any_over_high_current:
+                print(f"[ALERT] Detected that the current exceeds{current_high_threshold}mA,Stop control!")
+                robot.bus1.disable_torque()
+                robot.bus2.disable_torque()
+                time.sleep(10)
+
+                robot.bus1.enable_torque()
+                robot.bus2.enable_torque()
+                time.sleep(5)
+ 
+                left_arm.move_to_fixed_position(robot)
+                right_arm.move_to_fixed_position(robot)
+                print(f"[ALERT] Power-on is completed and reset")
+            
+                consecutive_over_current = 0
+            elif any_over_medium_current:
+                consecutive_over_current += 1
+                print(f"[WARNING] Detected that the current exceeds{current_medium_threshold}mA,counting: {consecutive_over_current}")
+                if consecutive_over_current >= 3:
+                    print(f"[ALERT] Three consecutive times the current exceeds{current_medium_threshold}mA,Stop control!")
+
+                    robot.bus1.disable_torque()
+                    robot.bus2.disable_torque()
+                    time.sleep(10)
+                    
+                    robot.bus1.enable_torque()
+                    robot.bus2.enable_torque()
+                    time.sleep(10)
+                    
+                    left_arm.move_to_fixed_position(robot)
+                    right_arm.move_to_fixed_position(robot)
+                    print(f"[ALERT] Power-on is completed and reset")
+                
+                    consecutive_over_current = 0
+            else:
+                consecutive_over_current = 0
+
+
 
             # 11.11Temperature alarm
             any_over_temp = any(temp > temp_threshold for temp in all_temp.values())
