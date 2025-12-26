@@ -103,7 +103,7 @@ class TelearmsXlerobot(TelearmsRobot):
             if axis(2) < -0.75:
                 action["."] = True
 
-            self.theta_speed = 80 * abs(axis(2)) / 2
+            self.theta_speed = 50 * abs(axis(2)) / 2
 
         # mode 1: arm translation
         elif right_mode == 1:
@@ -167,13 +167,13 @@ class TelearmsXlerobot(TelearmsRobot):
                 action["arrowdown"] = True
             if axis(1) < -0.1:
                 action["arrowup"] = True
-            self.x_speed = abs(axis(1)) * 0.4
+            self.x_speed = abs(axis(1)) * 0.2
 
             if axis(0) > 0.1:
                 action["arrowright"] = True
             if axis(0) < -0.1:
                 action["arrowleft"] = True
-            self.y_speed = abs(axis(0)) * 0.4
+            self.y_speed = abs(axis(0)) * 0.2
 
         # mode 1: arm translation
         elif left_mode == 1:
@@ -1028,15 +1028,13 @@ def main():
 
             obs = robot.get_observation()
 
+            
             if ROBOT_TYPE == "lekiwi":
                 report = {'obs': [float(obs[k]) for k in LEKIWI_DATA_ORDER],
                     'act': [float(action[k]) for k in LEKIWI_DATA_ORDER]}
             else:
                 report = {'obs': [float(obs[k]) for k in XLEROBOT_DATA_ORDER],
                     'act': [float(action[k]) for k in XLEROBOT_DATA_ORDER]}
-
-            # report
-            socket.send_string(json.dumps(report))
 
             angle_values = []
             act_values = []
@@ -1082,6 +1080,15 @@ def main():
                 csv_row[f"{motor}_temp"] = all_temp.get(motor, 0)
 
             csv_writer.writerow(csv_row)
+
+            max_current = float(max(all_current.values())) if all_current else 0.0
+            max_temp = float(max(all_temp.values())) if all_temp else 0.0
+
+            report['current'] = max_current
+            report['temp'] = max_temp
+
+            # report
+            socket.send_string(json.dumps(report))
             #11.11
 
             #Electric Current Warning

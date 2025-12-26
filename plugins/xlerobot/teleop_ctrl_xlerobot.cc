@@ -1,6 +1,7 @@
 #include <zmq.hpp>
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <mutex>
 #include <atomic>
 #include <thread>
@@ -39,6 +40,8 @@ class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
   json action_;
   json report_;
   std::mutex lock_;
+  float current_;
+  float temp_; 
 };
 
 TeleopCtrlXLerobot::TeleopCtrlXLerobot() : context_(1),
@@ -270,6 +273,11 @@ void TeleopCtrlXLerobot::Invoke() {
         report_ = json::parse(received);
         std::vector<float> obs = report_["obs"].get<std::vector<float>>();
         std::vector<float> act = report_["act"].get<std::vector<float>>();
+
+	current_ = report_["current"].get<float>();
+        temp_ = report_["temp"].get<float>();
+	std::cout << "current: " << std::fixed << std::setprecision(2)
+                  << current_ << " A, temp: " << temp_ << " °C" << std::endl;
         IngestTelemetry(obs.data(), obs.size(), act.data(), act.size());
       }
 
