@@ -274,9 +274,9 @@ void TeleopCtrlXLerobot::Invoke() {
         std::vector<float> obs = report_["obs"].get<std::vector<float>>();
         std::vector<float> act = report_["act"].get<std::vector<float>>();
 
-	current_ = report_["current"].get<float>();
+		current_ = report_["current"].get<float>();
         temp_ = report_["temp"].get<float>();
-	std::cout << "current: " << std::fixed << std::setprecision(2)
+		std::cout << "current: " << std::fixed << std::setprecision(2)
                   << current_ << " A, temp: " << temp_ << " °C" << std::endl;
         IngestTelemetry(obs.data(), obs.size(), act.data(), act.size());
       }
