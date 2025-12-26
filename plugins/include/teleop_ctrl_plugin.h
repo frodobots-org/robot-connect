@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <vector>
 
-typedef void (*SendMessageImpl)(const char*, size_t, const char*);
+typedef void (*SendMessageImpl)(const char*, size_t);
 typedef void (*IngestTelemetryImpl)(const float*, size_t, const float*, size_t);
 class TeleopCtrlPlugin {
  public:
@@ -18,9 +18,9 @@ class TeleopCtrlPlugin {
   void ingest_telemetry_impl(IngestTelemetryImpl IngestTelemetryImpl) {
     ingest_telemetry_impl_ = IngestTelemetryImpl;
   }
-  void SendMessage(const char* message, size_t size, const char* user_id) {
+  void SendMessage(const char* message, size_t size) {
     if (send_message_impl_) {
-      send_message_impl_(message, size, user_id);
+      send_message_impl_(message, size);
     }
   }
   void IngestTelemetry(const float* obs, size_t obs_size, const float* act, size_t act_size) {

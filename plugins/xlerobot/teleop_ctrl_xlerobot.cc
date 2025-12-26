@@ -40,8 +40,6 @@ class TeleopCtrlXLerobot : public TeleopCtrlPlugin {
   json action_;
   json report_;
   std::mutex lock_;
-  float current_;
-  float temp_; 
 };
 
 TeleopCtrlXLerobot::TeleopCtrlXLerobot() : context_(1),
@@ -273,12 +271,20 @@ void TeleopCtrlXLerobot::Invoke() {
         report_ = json::parse(received);
         std::vector<float> obs = report_["obs"].get<std::vector<float>>();
         std::vector<float> act = report_["act"].get<std::vector<float>>();
-
-		current_ = report_["current"].get<float>();
-        temp_ = report_["temp"].get<float>();
-		std::cout << "current: " << std::fixed << std::setprecision(2)
-                  << current_ << " A, temp: " << temp_ << " °C" << std::endl;
         IngestTelemetry(obs.data(), obs.size(), act.data(), act.size());
+
+        auto current = report_["current"].get<bool>();
+        auto temp = report_["temp"].get<bool>();
+        int error = 0;
+        if (current) {
+          error += 1;
+	}
+        if (temp) {
+          error += 2;
+        }
+        json error_obj;
+        error_obj["error"] = error;
+        SendMessage(error_obj.dump().c_str(), error_obj.dump().length());
       }
 
       //std::cout << "observation: " << received << std::endl;
